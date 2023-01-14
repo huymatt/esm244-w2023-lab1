@@ -12,3 +12,71 @@ library(here)
 library(sf)
 library(tmap)
 ```
+
+## Read in data
+
+```{r}
+sf_trees <- read_csv(here("data/sf_trees/sf_trees.csv"))
+```
+
+##Part 1: Wrangling and ggplot review
+####Example 1: Find counts of observations by legal_status and wrangle
+
+```{r}
+top_5_status <- sf_trees |>
+  count(legal_status) |> #get a count of the all values in legal status column
+  drop_na(legal_status) |> #drop any na values
+  rename(tree_count = n) |> #rename "n" to "tree_count"
+  relocate(tree_count) |> #move tree_count column to front
+  slice_max(tree_count, n = 5) |> #keep only the 5 most common legal statuses
+  arrange(-tree_count) #rearrange in descending order
+
+ggplot(data = top_5_status,
+       aes(x = fct_reorder(legal_status, tree_count), #reorder legal statuses by count
+           y = tree_count)) + 
+  geom_col() +
+  labs(y = "Tree Count",
+       x = "Legal Status") +
+  coord_flip() +
+  theme_minimal()
+```
+
+#### Example 2: Only keep observations where legal status is Permitted Site and caretaker is MTA. Store as permitted_mta.
+
+```{r}
+#only select rows where legal status and caretaker columns match "Permitted Site" and "MTA"
+permitted_mta <- sf_trees |>
+  filter(legal_status == "Permitted Site", caretaker =="MTA") 
+```
+
+#### Example 3: Only keep Blackwood Acacia trees, then only keep columns legal_status, date, latitude and longitude. Store as blackwood_acacia.
+
+```{r}
+blackwood_acacia <- sf_trees |>
+  filter(str_detect(species, "Blackwood Acacia")) |>
+  select(legal_status, date, latitude, longitude)
+
+# Make a little graph of locations (note R doesn't know these are spatial)
+
+ggplot(data = blackwood_acacia,
+       aes(x = longitude,
+           y = latitude)) +
+  geom_point()
+```
+
+#### Example 4: Meet tidyr::separate(). Separate the species column into two separate columns: spp_scientific and spp_common
+
+```{r}
+sf_trees_sep <- sf_trees |>
+  separate(species, into = c("spp_scientific", "spp_comon"), sep = "::")
+```
+
+#### Example 5: Meet tidyr::unite(). Yeah, it does the opposite. Unite the tree_id and legal_status columns, using a separator of “COOL” (no, you’d never actually do this…).
+
+```{r}
+sf_trees_unite <- sf_trees |>
+  unite("id_status", tree_id:legal_status, sep = "_COOL_")
+```
+
+##Part 2: Make some actual maps
+
